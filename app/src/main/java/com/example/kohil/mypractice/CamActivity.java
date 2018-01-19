@@ -1,7 +1,6 @@
 package com.example.kohil.mypractice;
 
 import android.Manifest;
-import android.annotation.TargetApi;
 import android.content.pm.PackageManager;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
@@ -9,15 +8,11 @@ import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
-import android.hardware.camera2.CaptureFailure;
 import android.hardware.camera2.CaptureRequest;
-import android.hardware.camera2.CaptureResult;
-import android.hardware.camera2.TotalCaptureResult;
-import android.hardware.camera2.params.StreamConfigurationMap;
-import android.os.Build;
+import android.media.MediaRecorder;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.os.Message;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
@@ -26,18 +21,21 @@ import android.util.Log;
 import android.util.Size;
 import android.view.Surface;
 import android.view.TextureView;
-import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.Toast;
-
 import com.tbruyelle.rxpermissions2.RxPermissions;
 
+import java.io.File;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.Date;
+import java.util.concurrent.Callable;
 
 public class CamActivity extends AppCompatActivity {
 
     TextureView textureView;
-    Button button;
+    ImageView photo, video;
     RxPermissions rxPermission;
     CameraManager cameraManager;
     private static final String TAG = "CamActivity:";
@@ -68,6 +66,9 @@ public class CamActivity extends AppCompatActivity {
     };
     private String cameraId;
     private CameraDevice cameraDevice;
+    String fileName;
+    File camera2VideoImagesDirectory;
+
     CameraDevice.StateCallback cameraDeviceCallBack = new CameraDevice.StateCallback() {
         @Override
         public void onOpened(@NonNull CameraDevice camera) {
@@ -96,9 +97,13 @@ public class CamActivity extends AppCompatActivity {
         setContentView(R.layout.activity_cam);
 
         handlePermission();
+        createFolder();
 
+        Log.d(TAG, "onCreate: "+fileName(true).getAbsolutePath());
+        Log.d(TAG, "onCreate: "+fileName(false).getAbsolutePath());
         textureView = (TextureView) findViewById(R.id.texture_view);
-        button = (Button) findViewById(R.id.button);
+        photo = (ImageView) findViewById(R.id.photo);
+        video = (ImageView) findViewById(R.id.video);
         textureView.setSurfaceTextureListener(surfaceTextureListener);
     }
 
@@ -154,7 +159,6 @@ public class CamActivity extends AppCompatActivity {
                 CameraCharacteristics cameraCharacteristics = cameraManager.getCameraCharacteristics(cameId);
                 if (cameraCharacteristics.get(CameraCharacteristics.LENS_FACING) == cameraCharacteristics.LENS_FACING_FRONT)
                     continue;
-
                 cameraId = cameId;
             }
         } catch (CameraAccessException e) {
@@ -162,6 +166,27 @@ public class CamActivity extends AppCompatActivity {
         }
     }
 
+    void setupMediaRecorder(){
+
+
+        MediaRecorder recorder = null;
+        try {
+            recorder = new MediaRecorder();
+            recorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
+            recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+            recorder.setVideoEncoder(MediaRecorder.VideoEncoder.DEFAULT);
+            recorder.setOutputFile(fileName(true).getAbsolutePath());
+            recorder.prepare();
+            recorder.start();   // Recording is now started
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+
+
+
+
+    }
     void connectCamera() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             return;
@@ -224,5 +249,32 @@ public class CamActivity extends AppCompatActivity {
             e.printStackTrace();
         }
 
+    }
+
+    void createFolder(){
+
+        File file = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES);
+        camera2VideoImagesDirectory = new File(file, "camera2VideoImagesDirectory");
+
+        if(camera2VideoImagesDirectory.exists()){
+
+        }else{
+            camera2VideoImagesDirectory.mkdir();
+        }
+    }
+
+    File fileName(boolean isImage){
+
+        String timeStamp = new SimpleDateFormat("yyyyDDmm_HHmmss").format(new Date());
+        String prefix = isImage ? "Image_":"Video_";
+        File tempFile = null;
+        try {
+            tempFile = File.createTempFile(prefix, timeStamp, camera2VideoImagesDirectory);
+            fileName = tempFile.getAbsolutePath();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return tempFile;
     }
 }
