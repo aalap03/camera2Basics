@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">MyPractice</string>
+
+    <string name="domain_name">Domain Name is empty</string>
+    <string name="user_name">User Name is Empty</string>
+    <string name="password">Password is empty</string>
 </resources>

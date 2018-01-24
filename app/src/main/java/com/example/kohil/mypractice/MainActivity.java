@@ -9,6 +9,8 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 
+import com.example.kohil.mypractice.MVPLogin_Crap.LoginActivity;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -74,7 +76,7 @@ public class MainActivity extends AppCompatActivity {
         cacheExample.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                startActivity(new Intent(MainActivity.this, CacheStorage.class));
+                startActivity(new Intent(MainActivity.this, LoginActivity.class));
             }
         });
     }

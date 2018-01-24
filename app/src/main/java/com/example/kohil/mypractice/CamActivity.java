@@ -19,18 +19,17 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.util.Size;
+import android.util.SparseIntArray;
 import android.view.Surface;
 import android.view.TextureView;
 import android.widget.ImageView;
 import android.widget.Toast;
 import com.tbruyelle.rxpermissions2.RxPermissions;
-
 import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
-import java.util.concurrent.Callable;
 
 public class CamActivity extends AppCompatActivity {
 
@@ -68,12 +67,24 @@ public class CamActivity extends AppCompatActivity {
     private CameraDevice cameraDevice;
     String fileName;
     File camera2VideoImagesDirectory;
+    int totalOrientation;
+    MediaRecorder recorder = null;
+    SparseIntArray sparseArray = new SparseIntArray();
+    boolean startRecording;
+    CameraCaptureSession mPreviewSession;
 
     CameraDevice.StateCallback cameraDeviceCallBack = new CameraDevice.StateCallback() {
         @Override
         public void onOpened(@NonNull CameraDevice camera) {
             cameraDevice = camera;
-            startPreview();
+
+            if(startRecording){
+                fileName(false);
+                startRecord();
+                recorder.start();
+            } else{
+                startPreview();
+            }
         }
 
         @Override
@@ -96,14 +107,38 @@ public class CamActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_cam);
 
-        handlePermission();
-        createFolder();
-
-        Log.d(TAG, "onCreate: "+fileName(true).getAbsolutePath());
-        Log.d(TAG, "onCreate: "+fileName(false).getAbsolutePath());
         textureView = (TextureView) findViewById(R.id.texture_view);
         photo = (ImageView) findViewById(R.id.photo);
         video = (ImageView) findViewById(R.id.video);
+
+        sparseArray.append(Surface.ROTATION_0, 0);
+        sparseArray.append(Surface.ROTATION_90, 90);
+        sparseArray.append(Surface.ROTATION_180, 180);
+        sparseArray.append(Surface.ROTATION_270, 270);
+
+        handlePermission();
+        createFolder();
+
+        photo.setOnClickListener(v -> {
+
+        });
+
+        video.setOnClickListener(v -> {
+            startRecording = !startRecording;
+
+            if(startRecording){
+                fileName(false);
+                startRecord();
+                recorder.start();
+            } else{
+                recorder.stop();
+                recorder.reset();
+                startPreview();
+            }
+        });
+
+        Log.d(TAG, "onCreate: "+fileName(true).getAbsolutePath());
+        Log.d(TAG, "onCreate: "+fileName(false).getAbsolutePath());
         textureView.setSurfaceTextureListener(surfaceTextureListener);
     }
 
@@ -113,7 +148,6 @@ public class CamActivity extends AppCompatActivity {
                 .requestEach(perms)
                 .subscribe(permission -> {
                     if (permission.granted) {
-                        Log.d(TAG, "onCreate: Done");
                     } else if (permission.shouldShowRequestPermissionRationale) {
                         rxPermission.shouldShowRequestPermissionRationale(this, permission.name);
                     } else {
@@ -157,6 +191,16 @@ public class CamActivity extends AppCompatActivity {
             String[] cameraIdList = cameraManager.getCameraIdList();
             for (String cameId : cameraIdList) {
                 CameraCharacteristics cameraCharacteristics = cameraManager.getCameraCharacteristics(cameId);
+
+                int deviceRotation = getWindowManager().getDefaultDisplay().getRotation();
+
+                totalOrientation = sensorDeviceRotation(cameraCharacteristics, deviceRotation);
+
+                int swappedHeight = ( totalOrientation == 90 || totalOrientation == 270 )
+                        ? width : height;
+                int swappedWidth = ( totalOrientation == 90 || totalOrientation == 270 )
+                        ? height : width;
+
                 if (cameraCharacteristics.get(CameraCharacteristics.LENS_FACING) == cameraCharacteristics.LENS_FACING_FRONT)
                     continue;
                 cameraId = cameId;
@@ -168,8 +212,6 @@ public class CamActivity extends AppCompatActivity {
 
     void setupMediaRecorder(){
 
-
-        MediaRecorder recorder = null;
         try {
             recorder = new MediaRecorder();
             recorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
@@ -177,16 +219,11 @@ public class CamActivity extends AppCompatActivity {
             recorder.setVideoEncoder(MediaRecorder.VideoEncoder.DEFAULT);
             recorder.setOutputFile(fileName(true).getAbsolutePath());
             recorder.prepare();
-            recorder.start();   // Recording is now started
         } catch (Exception e) {
             e.printStackTrace();
         }
-
-
-
-
-
     }
+    
     void connectCamera() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             return;
@@ -232,9 +269,10 @@ public class CamActivity extends AppCompatActivity {
             cameraDevice.createCaptureSession(Arrays.asList(surfacePreview), new CameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
+                    mPreviewSession = session;
                     Toast.makeText(CamActivity.this, "Configured", Toast.LENGTH_SHORT).show();
                     try {
-                        session.setRepeatingRequest(captureRequestBuilder.build(), null, backgroungHandler);
+                        mPreviewSession.setRepeatingRequest(captureRequestBuilder.build(), null, backgroungHandler);
                     } catch (CameraAccessException e) {
                         e.printStackTrace();
                     }
@@ -243,6 +281,43 @@ public class CamActivity extends AppCompatActivity {
                 @Override
                 public void onConfigureFailed(@NonNull CameraCaptureSession session) {
                     Toast.makeText(CamActivity.this, "Configure failed", Toast.LENGTH_SHORT).show();
+                }
+            }, null);
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    void startRecord(){
+
+        try {
+
+            if(mPreviewSession != null){
+                mPreviewSession.close();
+                mPreviewSession = null;
+            }
+            setupMediaRecorder();
+            SurfaceTexture surfaceTexture = textureView.getSurfaceTexture();
+            surfaceTexture.setDefaultBufferSize(textureView.getWidth(), textureView.getHeight());
+            Surface surface = new Surface(surfaceTexture);
+            Surface recordSurface = recorder.getSurface();
+            captureRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
+            captureRequestBuilder.addTarget(recordSurface);
+            captureRequestBuilder.addTarget(surface);
+            cameraDevice.createCaptureSession(Arrays.asList(surface, recordSurface), new CameraCaptureSession.StateCallback() {
+                @Override
+                public void onConfigured(@NonNull CameraCaptureSession session) {
+                    try {
+                        session.setRepeatingRequest(captureRequestBuilder.build(), null, null);
+                    } catch (CameraAccessException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                @Override
+                public void onConfigureFailed(@NonNull CameraCaptureSession session) {
+
                 }
             }, null);
         } catch (CameraAccessException e) {
@@ -264,8 +339,7 @@ public class CamActivity extends AppCompatActivity {
     }
 
     File fileName(boolean isImage){
-
-        String timeStamp = new SimpleDateFormat("yyyyDDmm_HHmmss").format(new Date());
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
         String prefix = isImage ? "Image_":"Video_";
         File tempFile = null;
         try {
@@ -276,5 +350,11 @@ public class CamActivity extends AppCompatActivity {
         }
 
         return tempFile;
+    }
+
+    int sensorDeviceRotation(CameraCharacteristics characteristics, int deviceOrientation){
+        int sensorRotation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
+        deviceOrientation = sparseArray.get(deviceOrientation);
+        return  (deviceOrientation + sensorRotation +360) % 360;
     }
 }

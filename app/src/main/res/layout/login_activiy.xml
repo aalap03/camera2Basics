@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="com.example.kohil.mypractice.MVPLogin_Crap.LoginActivity">
+
+    <EditText
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:id="@+id/domain_name"
+        android:hint="Domain Name"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:orientation="vertical"
+        android:id="@+id/login_group"
+        android:visibility="invisible"
+        android:layout_centerInParent="true"
+        android:gravity="center_vertical"
+        android:layout_margin="20dp"
+        android:layout_height="wrap_content">
+
+        <EditText
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Username"
+            android:id="@+id/username"/>
+
+        <EditText
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Password"
+            android:inputType="textPassword"
+            android:id="@+id/password"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:id="@+id/setup_org"
+            android:text="setup organization"
+            android:padding="10dp"
+            android:layout_height="wrap_content" />
+
+    </LinearLayout>
+
+    <Button
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_margin="10dp"
+        android:id="@+id/domain_login"
+        android:text="Accept Domain"/>
+
+    <ProgressBar
+        android:layout_width="wrap_content"
+        android:id="@+id/progress_bar"
+        android:visibility="invisible"
+        android:layout_centerInParent="true"
+        android:layout_height="wrap_content" />
+
+</RelativeLayout>
